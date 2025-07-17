@@ -56,7 +56,6 @@ def install_gradle(version="8.5"):
     zip_name = f"gradle-{version}-bin.zip"
     zip_url = f"https://services.gradle.org/distributions/{zip_name}"
     
-    # Check if  installed
     if gradle_subdir.exists():
         print(f"Gradle {version} already extracted.")
     else:
