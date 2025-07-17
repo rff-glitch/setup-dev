@@ -1,4 +1,4 @@
-# Save as installer.py and run on Windows
+
 import subprocess, requests, zipfile, os, threading, time
 from tkinter import Tk, Frame, Label, Button, Canvas, Scrollbar, ttk
 from pathlib import Path
@@ -16,7 +16,6 @@ APPS = {
     "CMake": "Kitware.CMake",
     "Temurin JDK 17": "EclipseAdoptium.Temurin.17.JDK",
     "WinRAR": "RARLab.WinRAR",
-    "Tor Browser": "TorProject.TorBrowser",
     "Go Lang": "GoLang.Go",
 }
 
@@ -49,7 +48,6 @@ ENV_VARS = {
 }
 
 def find_installation_path(possible_paths):
-    """Find the actual installation path from possible paths"""
     import glob
     for path_pattern in possible_paths:
         if '*' in path_pattern:
@@ -62,33 +60,25 @@ def find_installation_path(possible_paths):
     return None
 
 def set_environment_variable(var_name, var_value):
-    """Set system environment variable"""
     try:
-        # Set for current session
         os.environ[var_name] = var_value
-        
-        # Set permanently in Windows registry
         subprocess.run([
             "setx", var_name, var_value, "/M"
         ], check=True, capture_output=True)
-        
-        # Add to PATH if it's a binary directory
+
         if var_name in ["JAVA_HOME", "GOROOT"]:
             bin_path = os.path.join(var_value, "bin")
             if os.path.exists(bin_path):
                 subprocess.run([
                     "setx", "PATH", f"%PATH%;{bin_path}", "/M"
                 ], capture_output=True)
-        
         return True
     except Exception as e:
         print(f"Error setting {var_name}: {e}")
         return False
 
 def setup_environment_variables():
-    """Setup all environment variables"""
     results = {}
-    
     for var_name, possible_paths in ENV_VARS.items():
         actual_path = find_installation_path(possible_paths)
         if actual_path:
@@ -96,8 +86,7 @@ def setup_environment_variables():
             results[var_name] = {"path": actual_path, "success": success}
         else:
             results[var_name] = {"path": None, "success": False}
-    
-    # Special case for Gradle
+
     if GRADLE_DIR.exists():
         gradle_bin = str(GRADLE_DIR / "bin")
         success = set_environment_variable("GRADLE_HOME", str(GRADLE_DIR))
@@ -106,14 +95,14 @@ def setup_environment_variables():
                 "setx", "PATH", f"%PATH%;{gradle_bin}", "/M"
             ], capture_output=True)
         results["GRADLE_HOME"] = {"path": str(GRADLE_DIR), "success": success}
-    
+
     return results
 
 def is_installed(package_id):
     result = subprocess.run(["winget", "list", package_id], capture_output=True, text=True, shell=True)
     return package_id.lower() in result.stdout.lower()
 
-def install_app(package_id, label, progress):
+def install_app(package_id, status, progress):
     def task():
         if is_installed(package_id):
             status.config(text="✅ Already Installed", fg="#00AA00")
@@ -124,13 +113,12 @@ def install_app(package_id, label, progress):
         status.config(text="📥 Installing...", fg="yellow")
         progress["value"] = 0
         progress.config(style="installing.Horizontal.TProgressbar")
-        
+
         process = subprocess.Popen([
             "winget", "install", package_id,
             "--accept-source-agreements", "--accept-package-agreements"
         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, shell=True)
 
-        # Simulate progress based on installation phases
         phases = [
             ("📋 Preparing...", 10),
             ("⬇️ Downloading...", 30),
@@ -138,27 +126,68 @@ def install_app(package_id, label, progress):
             ("⚙️ Installing...", 80),
             ("🔧 Finalizing...", 95)
         ]
-        
+
         phase_index = 0
         line_count = 0
-        
+
         for line in process.stdout:
             line_count += 1
-            
-            # Update progress based on phases
             if line_count % 15 == 0 and phase_index < len(phases):
                 phase_text, target_progress = phases[phase_index]
                 status.config(text=phase_text, fg="yellow")
-                
-                # Animate progress to target
                 current = progress["value"]
                 for i in range(int(current), target_progress + 1):
                     progress["value"] = i
                     root.update_idletasks()
                     time.sleep(0.02)
-                
                 phase_index += 1
-        
+
+        process.wait()
+
+        if process.returncode == 0:
+            status.config(text="✅ Installed Successfully", fg="#00AA00")
+            progress["value"] = 100
+            progress.config(style="success.Horizontal.TProgressbar")
+        else:
+            status.config(text="❌ Installation Failed", fg="#FF6666")
+            progress["value"] = 0
+            progress.config(style="error.Horizontal.TProgressbar")
+
+    threading.Thread(target=task, daemon=True).start()
+
+def install_tor_browser(status, progress):
+    """Custom install for Tor Browser with special winget command"""
+    def task():
+        package_id = "TorProject.TorBrowser"
+        if is_installed(package_id):
+            status.config(text="✅ Already Installed", fg="#00AA00")
+            progress["value"] = 100
+            progress.config(style="success.Horizontal.TProgressbar")
+            return
+
+        status.config(text="📥 Installing Tor Browser...", fg="yellow")
+        progress["value"] = 0
+        progress.config(style="installing.Horizontal.TProgressbar")
+
+        process = subprocess.Popen([
+            "winget", "install", "--id=TorProject.TorBrowser", "-e", "--accept-source-agreements", "--accept-package-agreements"
+        ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, shell=True)
+
+        line_count = 0
+        while True:
+            line = process.stdout.readline()
+            if not line:
+                break
+            line_count += 1
+            if line_count % 15 == 0:
+                # Fake progress animation for Tor install
+                current = progress["value"]
+                target = min(current + 15, 95)
+                for i in range(current, target + 1):
+                    progress["value"] = i
+                    root.update_idletasks()
+                    time.sleep(0.02)
+
         process.wait()
 
         if process.returncode == 0:
@@ -190,7 +219,7 @@ def install_gradle(progress, label):
             label.config(text="⬇️ Downloading...", fg="yellow")
             progress["value"] = 0
             progress.config(style="installing.Horizontal.TProgressbar")
-            
+
             with requests.get(zip_url, stream=True) as r:
                 total = int(r.headers.get("content-length", 0))
                 downloaded = 0
@@ -206,18 +235,18 @@ def install_gradle(progress, label):
             label.config(text="📦 Extracting...", fg="yellow")
             progress["value"] = 75
             root.update_idletasks()
-            
+
             with zipfile.ZipFile(zip_name, 'r') as zip_ref:
                 zip_ref.extractall(GRADLE_DIR.parent)
 
             progress["value"] = 95
             root.update_idletasks()
-            
+
             os.remove(zip_name)
             label.config(text="✅ Installed Successfully", fg="#00AA00")
             progress["value"] = 100
             progress.config(style="success.Horizontal.TProgressbar")
-            
+
         except Exception as e:
             label.config(text="❌ Installation Failed", fg="#FF6666")
             progress["value"] = 0
@@ -235,7 +264,6 @@ root.configure(bg="#1a1a1a")
 style = ttk.Style()
 style.theme_use('clam')
 
-# Custom progress bar styles with red theme
 style.configure("installing.Horizontal.TProgressbar", 
                background="red", 
                troughcolor="#333333",
@@ -271,34 +299,27 @@ def update_scroll(event):
     canvas.configure(scrollregion=canvas.bbox("all"))
 content.bind("<Configure>", update_scroll)
 
-# Mouse wheel scrolling
 def on_mousewheel(event):
     canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 canvas.bind_all("<MouseWheel>", on_mousewheel)
 
-# Title (keeping original style)
 Label(content, text="🛠️ Raef Dev Setup", bg="#1a1a1a", fg="red", font=("Segoe UI", 16, "bold")).pack(pady=10)
 
 def add_tool_ui(name, package_id):
-    # Main container (improved original style)
     box = Frame(content, bg="#2a2a2a", padx=15, pady=8, relief="flat", bd=1)
     box.pack(fill="x", padx=10, pady=6)
-    
-    # App name
+
     Label(box, text=name, bg="#2a2a2a", fg="white", 
           width=20, anchor="w", font=("Segoe UI", 11, "bold")).pack(side="left")
-    
-    # Install button (keeping red theme)
+
     Button(box, text="Install", bg="red", fg="white", 
            font=("Segoe UI", 10, "bold"), relief="flat", bd=0, padx=15, pady=3,
            activebackground="#cc0000", activeforeground="white",
            command=lambda: install_app(package_id, status, progress)).pack(side="right")
-    
-    # Progress bar (enhanced but keeping original position)
+
     progress = ttk.Progressbar(box, length=120, mode='determinate')
     progress.pack(side="right", padx=8)
-    
-    # Status label (improved styling)
+
     status = Label(box, text="🔍 Checking...", fg="gray", bg="#2a2a2a", 
                   width=18, font=("Segoe UI", 10))
     status.pack(side="right", padx=5)
@@ -311,14 +332,44 @@ def add_tool_ui(name, package_id):
         else:
             status.config(text="❌ Not Installed", fg="#FF6666")
             progress["value"] = 0
-            
+
     threading.Thread(target=check_status, daemon=True).start()
 
-# Add all applications
+# Add all regular applications
 for name, pkg in APPS.items():
     add_tool_ui(name, pkg)
 
-# Gradle special case (keeping original layout but improved)
+# Special case for Tor Browser
+tor_box = Frame(content, bg="#2a2a2a", padx=15, pady=8, relief="flat", bd=1)
+tor_box.pack(fill="x", padx=10, pady=6)
+
+Label(tor_box, text="Tor Browser", bg="#2a2a2a", fg="white", 
+      width=20, anchor="w", font=("Segoe UI", 11, "bold")).pack(side="left")
+
+Button(tor_box, text="Install", bg="red", fg="white", 
+       font=("Segoe UI", 10, "bold"), relief="flat", bd=0, padx=15, pady=3,
+       activebackground="#cc0000", activeforeground="white",
+       command=lambda: install_tor_browser(tor_status, tor_progress)).pack(side="right")
+
+tor_progress = ttk.Progressbar(tor_box, length=120, mode='determinate')
+tor_progress.pack(side="right", padx=8)
+
+tor_status = Label(tor_box, text="🔍 Checking...", fg="gray", bg="#2a2a2a", 
+                   width=18, font=("Segoe UI", 10))
+tor_status.pack(side="right", padx=5)
+
+def check_tor_status():
+    if is_installed("TorProject.TorBrowser"):
+        tor_status.config(text="✅ Already Installed", fg="#00AA00")
+        tor_progress["value"] = 100
+        tor_progress.config(style="success.Horizontal.TProgressbar")
+    else:
+        tor_status.config(text="❌ Not Installed", fg="#FF6666")
+        tor_progress["value"] = 0
+
+threading.Thread(target=check_tor_status, daemon=True).start()
+
+# Gradle special case
 gradle_box = Frame(content, bg="#2a2a2a", padx=15, pady=8, relief="flat", bd=1)
 gradle_box.pack(fill="x", padx=10, pady=6)
 
@@ -347,7 +398,5 @@ def check_gradle_status():
         gradle_progress["value"] = 0
 
 threading.Thread(target=check_gradle_status, daemon=True).start()
-
-# Footer (removing it to keep original simplicity)
 
 root.mainloop()
