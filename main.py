@@ -1,5 +1,5 @@
-
-import subprocess
+import requests, zipfile, os, shutil, subprocess
+from pathlib import Path
 
 def IsAppInstalled(Package_ID):
     result = subprocess.run([
@@ -34,12 +34,9 @@ apps = [
     "Git.Git",
     "Microsoft.VisualStudio.2022.Community",
     "Google.AndroidStudio",
-    "Google.AndroidPlatformTools",
-    "Google.AndroidSdk.CommandlineTools",
     "Python.Python.3",
     "OpenJS.NodeJS",
     "RubyInstallerTeam.Ruby",
-    "gradle",
     "Kitware.CMake",
     "EclipseAdoptium.Temurin.17.JDK",
     "RARLab.WinRAR",
@@ -48,3 +45,33 @@ apps = [
 
 for app in apps :
     installAppUsingWinget(app)
+
+
+#install Gradle
+
+def install_gradle(version="8.5"):
+    gradle_dir = Path(f"C:/Gradle")
+    gradle_subdir = gradle_dir / f"gradle-{version}"
+    gradle_bin = gradle_subdir / "bin"
+    zip_name = f"gradle-{version}-bin.zip"
+    zip_url = f"https://services.gradle.org/distributions/{zip_name}"
+    
+    # Check if  installed
+    if gradle_subdir.exists():
+        print(f"Gradle {version} already extracted.")
+    else:
+        print(f" Downloading Gradle {version}...")
+        r = requests.get(zip_url, stream=True)
+        with open(zip_name, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(" Extracting...")
+        with zipfile.ZipFile(zip_name, 'r') as zip_ref:
+            zip_ref.extractall(gradle_dir)
+
+        os.remove(zip_name)
+        print(f"Gradle {version} installed to {gradle_subdir}")
+
+
+install_gradle()
