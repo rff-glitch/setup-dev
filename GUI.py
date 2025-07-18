@@ -110,7 +110,7 @@ def install_app(package_id, status, progress):
             progress.config(style="success.Horizontal.TProgressbar")
             return
 
-        status.config(text="📥 Installing...", fg="yellow")
+        status.config(text="Installing...", fg="yellow")
         progress["value"] = 0
         progress.config(style="installing.Horizontal.TProgressbar")
 
@@ -125,7 +125,7 @@ def install_app(package_id, status, progress):
             ("📦 Extracting...", 60),
             ("⚙️ Installing...", 80),
             ("🔧 Finalizing...", 95)
-        ]
+        ] 
 
         phase_index = 0
         line_count = 0
@@ -165,7 +165,7 @@ def install_tor_browser(status, progress):
             progress.config(style="success.Horizontal.TProgressbar")
             return
 
-        status.config(text="📥 Installing Tor Browser...", fg="yellow")
+        status.config(text=" Installing Tor Browser...", fg="yellow")
         progress["value"] = 0
         progress.config(style="installing.Horizontal.TProgressbar")
 
@@ -256,7 +256,7 @@ def install_gradle(progress, label):
 
 # GUI Setup
 root = Tk()
-root.title(" Raef's Dev Tools Installer")
+root.title(" Tools Installer")
 root.geometry("610x700")
 root.configure(bg="#1a1a1a")
 
@@ -303,7 +303,7 @@ def on_mousewheel(event):
     canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 canvas.bind_all("<MouseWheel>", on_mousewheel)
 
-Label(content, text="🛠️ Raef Dev Setup", bg="#1a1a1a", fg="red", font=("Segoe UI", 16, "bold")).pack(pady=10)
+Label(content, text="🛠️ Raef ", bg="#1a1a1a", fg="red", font=("Segoe UI", 16, "bold")).pack(pady=10)
 
 def add_tool_ui(name, package_id):
     box = Frame(content, bg="#2a2a2a", padx=15, pady=8, relief="flat", bd=1)
